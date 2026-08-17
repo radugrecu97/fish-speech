@@ -27,6 +27,7 @@ class TTSInferenceEngine(ReferenceLoader, VQManager):
         decoder_model: DAC,
         precision: torch.dtype,
         compile: bool,
+        llama_device: str = "cuda",
     ) -> None:
 
         super().__init__()
@@ -35,6 +36,7 @@ class TTSInferenceEngine(ReferenceLoader, VQManager):
         self.decoder_model = decoder_model
         self.precision = precision
         self.compile = compile
+        self.llama_device = llama_device
 
     @torch.inference_mode()
     def inference(self, req: ServeTTSRequest) -> Generator[InferenceResult, None, None]:
@@ -150,7 +152,7 @@ class TTSInferenceEngine(ReferenceLoader, VQManager):
 
         # Prepare the request
         request = dict(
-            device=self.decoder_model.device,
+            device=self.llama_device,
             max_new_tokens=req.max_new_tokens,
             text=req.text,
             top_p=req.top_p,

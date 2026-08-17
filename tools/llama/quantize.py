@@ -172,6 +172,69 @@ class QuantHandler:
         pass
 
 
+##### Weight-only fp8 per-row quantized code ######
+
+
+def replace_linear_weight_only_fp8(module):
+    for name, child in module.named_children():
+        if isinstance(child, nn.Linear):
+            setattr(
+                module,
+                name,
+                WeightOnlyFP8Linear(child.in_features, child.out_features),
+            )
+        else:
+            replace_linear_weight_only_fp8(child)
+
+
+class WeightOnlyFP8Linear(torch.nn.Module):
+    __constants__ = ["in_features", "out_features"]
+    in_features: int
+    out_features: int
+    weight: torch.Tensor
+    scale: torch.Tensor
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = False,
+        device=None,
+        dtype=None,
+    ) -> None:
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.register_buffer(
+            "weight",
+            torch.empty((out_features, in_features), dtype=torch.float8_e4m3fn),
+        )
+        self.register_buffer(
+            "scale",
+            torch.ones((out_features, 1), dtype=torch.float32),
+        )
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        w = self.weight.to(input.dtype) * self.scale.to(input.dtype)
+        return F.linear(input, w)
+
+    def _apply(self, fn, recurse=True):
+        prev_weight = self.weight
+        super()._apply(fn, recurse=recurse)
+        if prev_weight.dtype == torch.float8_e4m3fn:
+            self.weight = prev_weight.to(device=self.scale.device)
+        return self
+
+
+class WeightOnlyFP8QuantHandler:
+    def __init__(self, mod):
+        self.mod = mod
+
+    def convert_for_runtime(self):
+        replace_linear_weight_only_fp8(self.mod)
+        return self.mod
+
+
 ##### Weight-only int8 per-channel quantized code ######
 
 

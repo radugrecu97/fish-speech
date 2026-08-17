@@ -246,6 +246,16 @@ def _remap_fish_qwen3_omni_keys(weights: OrderedDict) -> OrderedDict:
     return new_weights
 
 
+def _remap_quantization_keys(weights: OrderedDict) -> OrderedDict:
+    new_weights = OrderedDict()
+    for k, v in weights.items():
+        if k.endswith(".weight.scale"):
+            new_weights[k[:-13] + ".scale"] = v
+        else:
+            new_weights[k] = v
+    return new_weights
+
+
 class BaseTransformer(nn.Module):
     def __init__(
         self,
@@ -526,14 +536,21 @@ class BaseTransformer(nn.Module):
         if load_weights is False:
             logger.info("Randomly initialized model")
         else:
-            if "int8" in str(Path(path)):
+            if "fp8" in str(Path(path)) or (Path(path) / "quantization_info.json").exists():
+                logger.info("Using fp8 weight-only quantization!")
+                from tools.llama.quantize import WeightOnlyFP8QuantHandler
+
+                simple_quantizer = WeightOnlyFP8QuantHandler(model)
+                model = simple_quantizer.convert_for_runtime()
+
+            elif "int8" in str(Path(path)):
                 logger.info("Using int8 weight-only quantization!")
                 from tools.llama.quantize import WeightOnlyInt8QuantHandler
 
                 simple_quantizer = WeightOnlyInt8QuantHandler(model)
                 model = simple_quantizer.convert_for_runtime()
 
-            if "int4" in str(Path(path)):
+            elif "int4" in str(Path(path)):
                 logger.info("Using int4 quantization!")
                 path_comps = path.name.split("-")
                 assert path_comps[-2].startswith("g")
@@ -558,13 +575,13 @@ class BaseTransformer(nn.Module):
                 weights = OrderedDict()
                 for shard in shard_files:
                     weights.update(st_load_file(str(path_obj / shard), device="cpu"))
-                weights = _remap_fish_qwen3_omni_keys(weights)
+                weights = _remap_quantization_keys(_remap_fish_qwen3_omni_keys(weights))
             elif single_st.exists():
                 logger.info("Loading single safetensors weights")
                 from safetensors.torch import load_file as st_load_file
 
                 weights = OrderedDict(st_load_file(str(single_st), device="cpu"))
-                weights = _remap_fish_qwen3_omni_keys(weights)
+                weights = _remap_quantization_keys(_remap_fish_qwen3_omni_keys(weights))
             elif pth_file.exists():
                 weights = torch.load(
                     pth_file,

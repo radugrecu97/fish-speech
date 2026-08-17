@@ -264,13 +264,14 @@ def generate(
             f"Input sequence length {T} exceeds max_seq_len {model.config.max_seq_len}"
         )
 
+    max_cache_len = min(model.config.max_seq_len, 4096)
     if max_new_tokens:
-        if T + max_new_tokens > model.config.max_seq_len:
-            max_new_tokens = model.config.max_seq_len - T
+        if T + max_new_tokens > max_cache_len:
+            max_new_tokens = max(1, max_cache_len - T)
 
         T_new = T + max_new_tokens
     else:
-        T_new = model.config.max_seq_len
+        T_new = max_cache_len
         max_new_tokens = T_new - T
 
     device = prompt.device
@@ -283,7 +284,7 @@ def generate(
         with torch.device(device):
             model.setup_caches(
                 max_batch_size=1,  # Fixed to 1, avoid dynamic changes
-                max_seq_len=model.config.max_seq_len,
+                max_seq_len=max_cache_len,
                 dtype=next(model.parameters()).dtype,
             )
         model._cache_setup_done = True
@@ -293,7 +294,7 @@ def generate(
     # Create new tensor each time, but try to reuse memory
     input_pos = torch.arange(0, T, device=device, dtype=torch.long)
     empty = torch.empty(
-        (codebook_dim, model.config.max_seq_len), dtype=prompt.dtype, device=device
+        (codebook_dim, max_cache_len), dtype=prompt.dtype, device=device
     )
     empty[:, :T] = prompt
     seq = empty
@@ -363,6 +364,8 @@ def init_model(checkpoint_path, device, precision, compile=False):
     model = DualARTransformer.from_pretrained(checkpoint_path, load_weights=True)
 
     model = model.to(device=device, dtype=precision)
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     logger.info(f"Restored model from checkpoint")
 
     if isinstance(model, DualARTransformer):
@@ -758,10 +761,11 @@ def launch_thread_safe_queue(
         model, decode_one_token = init_model(
             checkpoint_path, device, precision, compile=compile
         )
+        max_cache_len = min(model.config.max_seq_len, 4096)
         with torch.device(device):
             model.setup_caches(
                 max_batch_size=1,
-                max_seq_len=model.config.max_seq_len,
+                max_seq_len=max_cache_len,
                 dtype=next(model.parameters()).dtype,
             )
         init_event.set()

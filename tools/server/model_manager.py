@@ -47,6 +47,7 @@ class ModelManager:
             decoder_model=self.decoder_model,
             precision=self.precision,
             compile=self.compile,
+            llama_device=self.device,
         )
 
         # Warm up the models
@@ -82,7 +83,7 @@ class ModelManager:
             text="Hello world.",
             references=[],
             reference_id=None,
-            max_new_tokens=1024,
+            max_new_tokens=64,
             chunk_length=200,
             top_p=0.7,
             repetition_penalty=1.2,
