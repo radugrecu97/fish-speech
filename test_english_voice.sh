@@ -44,7 +44,7 @@ text = re.sub(r'(\d+)\.(\d+)', r'\1 point \2', text)
 
 # Prepend calm narrator tag if no custom tag provided
 if not text.strip().startswith('['):
-    text = '[calm and soothing voice] [speaking softly and clearly] ' + text
+    text = '[calm and soothing audiobook narrator] [speaking softly, steadily, and clearly] ' + text
 
 print(text.strip())
 ")

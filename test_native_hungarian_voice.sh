@@ -48,7 +48,7 @@ text = re.sub(r'(\d+),(\d+)', r'\1 egész \2 tized', text)
 
 # 3. Prepend style tag if no custom tag is provided
 if not text.strip().startswith('['):
-    text = '[speaking naturally with clear articulation] ' + text
+    text = '[calm and soothing audiobook narrator] [speaking softly, steadily, and clearly] ' + text
 
 print(text.strip())
 ")
