@@ -2,7 +2,7 @@
 set -e
 
 SERVER_URL="http://127.0.0.1:8080/v1/tts"
-VOICE_FILE="native_hungarian_ref.wav"
+VOICE_FILE="hungarian_sziszi.wav"
 OUTPUT_FILE="${2:-calm_hungarian_output.wav}"
 SEED="${3:-42}"
 
